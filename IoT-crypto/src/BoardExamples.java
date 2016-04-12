@@ -1,19 +1,25 @@
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.Arrays;
 
 import org.apache.commons.codec.DecoderException;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.encodings.PKCS1Encoding;
 import org.bouncycastle.crypto.engines.RSAEngine;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
+import org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters;
+import org.bouncycastle.crypto.util.PrivateKeyFactory;
 import org.bouncycastle.crypto.util.PublicKeyFactory;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
 
 
 public class BoardExamples {
 
-	// private RSAPrivateCrtKeyParameters priv;
+	private RSAPrivateCrtKeyParameters priv;
 	private RSAKeyParameters pub;
 	
 	/**
@@ -35,7 +41,6 @@ public class BoardExamples {
 		this.pub = param;
 	}
 	
-	/*
 	public void loadPrivateKeyPEM(byte[] key) throws IOException {
 		PEMParser pp = new PEMParser(new StringReader(new String(key)));
 		PEMKeyPair kp = (PEMKeyPair) pp.readObject();
@@ -47,7 +52,6 @@ public class BoardExamples {
 		this.pub  = rsaPub;
 		this.priv = rsa;
 	}
-	*/
 	
 	/*
 	public void genKey() {
@@ -72,14 +76,27 @@ public class BoardExamples {
 		return result;
 	}
 	
-	/*
-	public byte[] sign(byte[] message) {
+	public byte[] sign(byte[] message) throws InvalidCipherTextException {
+		/*
+		 * RSA Engine for the actual cryptographic unwrap oeration.
+		 */
 		RSAEngine rsaEngine = new RSAEngine();
-		rsaEngine.init(true, priv);
+		/*
+		 * PKCS1.5 Encoding unwrap.
+		 */
+		PKCS1Encoding pkcs1 = new PKCS1Encoding(rsaEngine);
+		/*
+		 * Init the engine with the public key and with encryption=false.
+		 */
+		pkcs1.init(true, priv);
+		/*
+		 * Get the HASH block.
+		 */
 		byte[] hash = hashSha256(message);
-		return rsaEngine.processBlock(hash, 0, hash.length);
+		return pkcs1.processBlock(hash, 0, hash.length);
+
+		
 	}
-	*/
 	
 	/**
 	 * Takes a RSA Signature with PKCS1.5 padding and returnes the hash of the signed data.
@@ -131,12 +148,14 @@ public class BoardExamples {
 				"b";
 
 		byte[] board_public_key_byte = Util.parseHex(board_public_key);
-		byte[] signature_byte = Util.parseHex(signature);
+		// byte[] signature_byte = Util.parseHex(signature);
 
-		be.loadPublicKeyDER(board_public_key_byte);
+		// be.loadPublicKeyDER(board_public_key_byte);
+		be.loadPrivateKeyPEM(Util.readResFile("test.key"));
 
 		try {
 			byte[] hashFirst = be.hashSha256(message.getBytes());
+			byte[] signature_byte = be.sign(message.getBytes());
 			byte[] hashSecond = be.verifyGetHashFromSignature(signature_byte);
 			dumpHashes(hashFirst, hashSecond);
 			if (!Arrays.equals(hashFirst, hashSecond)) {
